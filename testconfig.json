@@ -1,0 +1,19 @@
+{
+    "EnvironmentName":"Connected-GSTN",
+    "VpcCIDR":"10..0.0/16",
+    "cidr_mask":"24",
+    "PrivateSubnet4CIDR":"10..6.0/24",
+    "PrivateSubnet5CIDR":"10..7.0/24",
+    "PrivateSubnet6CIDR":"10..8.0/24",
+    "Certificatearn":"",
+    "InternalALBLogsBucketName":"-internalalb-logs-bucket",
+    "PublicALBLogsBucketName":"-publicalb-logs-bucket",
+    "region":"ap-south-1",
+    "availability_zones":["ap-south-1a","ap-south-1b","ap-south-1c"],
+    "role_arn":"arn:aws:iam:::role/SSM-Role",
+    "min_capacity":2,
+    "desired_capacity":2,
+    "max_capacity":2,
+    "instance_type":"m6a.large",
+    "NATIP":"/32"
+}

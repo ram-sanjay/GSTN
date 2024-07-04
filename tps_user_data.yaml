@@ -1,0 +1,69 @@
+#!/bin/bash
+ 
+sudo apt-get install nvme-cli -y
+ 
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+REGION="ap-south-1"
+MOUNT_POINT="/home/ubuntu/code.tgps/logs/audit"
+TAG_NAME="Name"
+TAG_VALUE="TPS_CGSTN"
+AVAILABILITY_ZONE=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+AVAILABLE_VOLUMES=$(aws ec2 describe-volumes \
+  --region $REGION \
+  --filters "Name=tag:$TAG_NAME,Values=$TAG_VALUE" "Name=availability-zone,Values=$AVAILABILITY_ZONE" \
+  --query "Volumes[].VolumeId" \
+  --output text)
+if [ -z "$AVAILABLE_VOLUMES" ]; then
+  echo "No available EBS volumes found with tag $TAG_NAME=$TAG_VALUE in availability zone $AVAILABILITY_ZONE."
+  exit 1
+fi
+ 
+for VOLUME_ID in $AVAILABLE_VOLUMES; do
+  VOLUME_STATE=$(aws ec2 describe-volumes --region $REGION --volume-ids $VOLUME_ID --query "Volumes[0].State" --output text)
+  if [ "$VOLUME_STATE" != "available" ]; then
+    echo "Volume $VOLUME_ID is not available. Skipping."
+    continue
+  fi
+ 
+vol_id=$(echo "$VOLUME_ID" | sed 's/-//g')
+echo vol_id $vol_id
+ 
+  aws ec2 attach-volume \
+    --region $REGION \
+    --volume-id $VOLUME_ID \
+    --instance-id $INSTANCE_ID \
+    --device /dev/xvdh
+ 
+  while [ "$(aws ec2 describe-volumes --region $REGION --volume-ids $VOLUME_ID --query "Volumes[0].Attachments[0].State" --output text)" != "attached" ]; do
+    sleep 1
+  done
+ 
+  echo "Volume $VOLUME_ID successfully attached."
+  AVAILABLE_VOLUME=$VOLUME_ID
+  break
+done
+ 
+if [ -z "$AVAILABLE_VOLUME" ]; then
+  echo "No available EBS volumes could be attached."
+  exit 1
+fi
+ 
+mkdir -p $MOUNT_POINT
+mount=$(sudo nvme list | grep $vol_id | awk '{print $1}')
+ 
+echo mount $mount
+ 
+FILE_SYSTEM=$(blkid -o value -s TYPE $mount)
+ 
+if [ -z "$FILE_SYSTEM" ]; then
+ 
+  mkfs -t ext4 $mount
+fi
+ 
+ 
+mount $mount $MOUNT_POINT
+ 
+cd /home/ubuntu/code.tgps
+sudo npm i
+sudo npm run start &
+disown
